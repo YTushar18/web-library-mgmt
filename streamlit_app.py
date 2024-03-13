@@ -30,8 +30,19 @@ def return_book(book_id):
 def main():
     st.title("Library Management System")
 
-    menu = ["Home", "Login", "Register", "Add Book", "Issue Book", "Return Book", "View Books"]
+    # Initialize session state for login status and username
+    if 'logged_in' not in st.session_state:
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = ''
+
+    menu = ["Home", "Login", "Register"]
+    if st.session_state['logged_in']:
+        menu.extend(["Add Book", "Issue Book", "Return Book", "View All Books", "Logout"])
+
     choice = st.sidebar.selectbox("Menu", menu)
+
+    if st.session_state['logged_in']:
+        st.write(f"Welcome, {st.session_state['username']}!")
 
     if choice == "Register":
         st.subheader("Register")
@@ -49,10 +60,13 @@ def main():
             result = login_user(username, password)
             if result.get('message') == 'Login successful':
                 st.success(result['message'])
+                st.session_state['logged_in'] = True
+                st.session_state['username'] = username
+                st.experimental_rerun()  # Rerun the app to refresh the page
             else:
                 st.error(result['message'])
 
-    elif choice == "Add Book":
+    elif choice == "Add Book" and st.session_state['logged_in']:
         st.subheader("Add Book")
         book_id = st.text_input("Book ID")
         book_title = st.text_input("Book Title")
@@ -62,32 +76,38 @@ def main():
             result = add_book(book_id, book_info)
             st.success(result['message'])
 
-    elif choice == "Issue Book":
+    elif choice == "Issue Book" and st.session_state['logged_in']:
         st.subheader("Issue Book")
         book_id = st.text_input("Book ID")
         if st.button("Issue Book"):
             result = issue_book(book_id)
             st.success(result['message'])
 
-    elif choice == "Return Book":
+    elif choice == "Return Book" and st.session_state['logged_in']:
         st.subheader("Return Book")
         book_id = st.text_input("Book ID")
         if st.button("Return Book"):
             result = return_book(book_id)
             st.success(result['message'])
 
-    elif choice == "View Books":
+    elif choice == "View All Books" and st.session_state['logged_in']:
         st.subheader("Available Books")
         books = get_books()
-        if books:
-            for book_id, book_info in books.items():
-                st.write(f"ID: {book_id}, Title: {book_info['title']}, Author: {book_info['author']}, Status: {book_info['status']}")
-        else:
-            st.write("No books available")
+        for book_id, book_info in books.items():
+            st.write(f"ID: {book_id}, Title: {book_info['title']}, Author: {book_info['author']}, Status: {book_info['status']}")
+
+    elif choice == "Logout" and st.session_state['logged_in']:
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = ''
+        st.experimental_rerun()  # Rerun the app to refresh the page
+        st.success("You have been logged out.")
 
     else:
         st.subheader("Home")
-        st.write("Welcome to the Library Management System")
+        if st.session_state['logged_in']:
+            st.write("You are logged in to the Library Management System")
+        else:
+            st.write("Please log in to access the Library Management System")
 
 if __name__ == '__main__':
     main()
