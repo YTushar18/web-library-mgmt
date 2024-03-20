@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-BASE_URL = "http://127.0.0.1:5000"  # Adjust if your Flask app is running on a different address
+BASE_URL = "http://127.0.0.1:5000"  
 
 def register_user(username, password):
     response = requests.post(f"{BASE_URL}/register", json={"username": username, "password": password})
@@ -30,7 +30,6 @@ def return_book(book_id):
 def main():
     st.title("Library Management System")
 
-    # Initialize session state for login status and username
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
         st.session_state['username'] = ''
@@ -62,7 +61,7 @@ def main():
                 st.success(result['message'])
                 st.session_state['logged_in'] = True
                 st.session_state['username'] = username
-                st.experimental_rerun()  # Rerun the app to refresh the page
+                st.experimental_rerun() 
             else:
                 st.error(result['message'])
 
@@ -99,7 +98,7 @@ def main():
     elif choice == "Logout" and st.session_state['logged_in']:
         st.session_state['logged_in'] = False
         st.session_state['username'] = ''
-        st.experimental_rerun()  # Rerun the app to refresh the page
+        st.experimental_rerun() 
         st.success("You have been logged out.")
 
     else:

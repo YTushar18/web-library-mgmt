@@ -1,58 +1,89 @@
 from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# In-memory "database" for simplicity
-users = {}
-books = {}
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(50), nullable=False)
+
+class Book(db.Model):
+    id = db.Column(db.String(50), primary_key=True) 
+    title = db.Column(db.String(100))
+    author = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='available')
 
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    if username in users:
+    if User.query.filter_by(username=username).first():
         return jsonify({'message': 'User already exists'}), 400
-    users[username] = {'password': password}
+    new_user = User(username=username, password=password)
+    db.session.add(new_user)
+    db.session.commit()
     return jsonify({'message': 'User registered successfully'}), 201
+
 
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    if username not in users or users[username]['password'] != password:
+    user = User.query.filter_by(username=username, password=password).first()
+    if user:
+        return jsonify({'message': 'Login successful'}), 200
+    else:
         return jsonify({'message': 'Invalid credentials'}), 401
-    return jsonify({'message': 'Login successful'}), 200
 
 @app.route('/books', methods=['GET', 'POST'])
 def manage_books():
     if request.method == 'GET':
+        books_query = Book.query.all()
+        books = {book.id: {"title": book.title, "author": book.author, "status": book.status} for book in books_query}
         return jsonify(books)
     elif request.method == 'POST':
         data = request.json
         book_id = data.get('book_id')
         book_info = data.get('book_info')
-        books[book_id] = book_info
+        if Book.query.filter_by(id=book_id).first():
+            return jsonify({'message': 'Book already exists'}), 400
+        new_book = Book(id=book_id, title=book_info['title'], author=book_info['author'], status='available')
+        db.session.add(new_book)
+        db.session.commit()
         return jsonify({'message': 'Book added successfully'}), 201
 
 @app.route('/issue', methods=['POST'])
 def issue_book():
     data = request.json
     book_id = data.get('book_id')
-    if book_id not in books or books[book_id].get('status') == 'issued':
+    book = Book.query.filter_by(id=book_id).first()
+    if not book or book.status == 'issued':
         return jsonify({'message': 'Book not available'}), 400
-    books[book_id]['status'] = 'issued'
+    book.status = 'issued'
+    db.session.commit()
     return jsonify({'message': 'Book issued successfully'}), 200
 
 @app.route('/return', methods=['POST'])
 def return_book():
     data = request.json
     book_id = data.get('book_id')
-    if book_id not in books or books[book_id].get('status') != 'issued':
+    book = Book.query.filter_by(id=book_id).first()
+    if not book or book.status != 'issued':
         return jsonify({'message': 'Invalid return'}), 400
-    books[book_id]['status'] = 'available'
+    book.status = 'available'
+    db.session.commit()
     return jsonify({'message': 'Book returned successfully'}), 200
 
+
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all() 
     app.run(debug=True)
