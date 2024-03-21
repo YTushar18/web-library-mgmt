@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -19,9 +21,20 @@ class Book(db.Model):
     author = db.Column(db.String(100))
     status = db.Column(db.String(20), default='available')
 
+@app.route('/book/<book_id>', methods=['GET'])
+def get_book(book_id):
+    book = Book.query.filter_by(id=book_id).first()
+    if book:
+        return jsonify({"id": book.id, "title": book.title, "author": book.author, "status": book.status}), 200
+    else:
+        return jsonify({'message': 'Book not found'}), 404
+
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
+    if request.content_type == 'application/json':
+        data = request.json
+    else:
+        data = request.form
     username = data.get('username')
     password = data.get('password')
     if User.query.filter_by(username=username).first():
@@ -42,13 +55,33 @@ def login():
         return jsonify({'message': 'Login successful'}), 200
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
+    
+# @app.route('/login', methods=['POST'])
+# def login():
+#     data = request.json
+#     username = data.get('username')
+#     password = data.get('password')
+#     user = User.query.filter_by(username=username, password=password).first()
+#     if user:
+#         # Redirect to the view_books endpoint after successful login
+#         return redirect(url_for('view_books'))
+#     else:
+#         return jsonify({'message': 'Invalid credentials'}), 401
+
+# @app.route('/view_books', methods=['GET'])
+# def view_books():
+#     books_query = Book.query.all()
+#     books = {book.id: {"title": book.title, "author": book.author, "status": book.status} for book in books_query}
+#     return jsonify(books)    
 
 @app.route('/books', methods=['GET', 'POST'])
 def manage_books():
     if request.method == 'GET':
         books_query = Book.query.all()
         books = {book.id: {"title": book.title, "author": book.author, "status": book.status} for book in books_query}
-        return jsonify(books)
+        response = jsonify(books)
+        response.headers['X-Custom-Header'] = 'CustomHeader'
+        return response
     elif request.method == 'POST':
         data = request.json
         book_id = data.get('book_id')
