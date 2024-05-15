@@ -1,11 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
+import certifi
 
 app = Flask(__name__)
 CORS(app)
 
-client = MongoClient('env-var') #Update env variable
+client = MongoClient('mongodb+srv://iabhishekapp:BNYopb29Qevxi8Ch@backendpro.5qozij5.mongodb.net/?retryWrites=true&w=majority&appName=BackendPro',
+                     tlsCAFile=certifi.where()) #Update env variable
+
 db = client['library_db']
 users_collection = db['users']
 books_collection = db['books']
