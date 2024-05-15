@@ -13,31 +13,37 @@ def login_user(username, password):
     response = requests.post(f"{BASE_URL}/login", json={"username": username, "password": password})
     return response.json()
 
-def add_book(book_id, book_info):
-    response = requests.post(f"{BASE_URL}/books", json={"book_id": book_id, "book_info": book_info})
+def add_book(token, book_id, book_info):
+    headers = {'x-access-token': token}
+    response = requests.post(f"{BASE_URL}/books", json={"book_id": book_id, "book_info": book_info}, headers=headers)
     return response.json()
 
-def add_books_bulk(books):
-    response = requests.post(f"{BASE_URL}/books/bulk", json={"books": books})
+def add_books_bulk(token, books):
+    headers = {'x-access-token': token}
+    response = requests.post(f"{BASE_URL}/books/bulk", json={"books": books}, headers=headers)
     return response.json()
 
-def get_books():
-    response = requests.get(f"{BASE_URL}/books")
+def get_books(token):
+    headers = {'x-access-token': token}
+    response = requests.get(f"{BASE_URL}/books", headers=headers)
     return response.json()
 
-def get_book_details(book_id):
-    response = requests.get(f"{BASE_URL}/book/{book_id}")
+def get_book_details(token, book_id):
+    headers = {'x-access-token': token}
+    response = requests.get(f"{BASE_URL}/book/{book_id}", headers=headers)
     if response.status_code == 200:
         return response.json(), True
     else:
         return response.json(), False
 
-def issue_book(book_id):
-    response = requests.post(f"{BASE_URL}/issue", json={"book_id": book_id})
+def issue_book(token, book_id):
+    headers = {'x-access-token': token}
+    response = requests.post(f"{BASE_URL}/issue", json={"book_id": book_id}, headers=headers)
     return response.json()
 
-def return_book(book_id):
-    response = requests.post(f"{BASE_URL}/return", json={"book_id": book_id})
+def return_book(token, book_id):
+    headers = {'x-access-token': token}
+    response = requests.post(f"{BASE_URL}/return", json={"book_id": book_id}, headers=headers)
     return response.json()
 
 def main():
@@ -46,10 +52,11 @@ def main():
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
         st.session_state['username'] = ''
+        st.session_state['token'] = ''
 
-    menu = ["Home", "Login", "Register", "View Book Details"]
+    menu = ["Home", "Login", "Register"]
     if st.session_state['logged_in']:
-        menu = ["Home", "Add Book", "Issue Book", "Return Book", "View All Books", "Logout"]
+        menu = ["Home", "Add Book", "Issue Book", "Return Book", "View Book Details", "View All Books", "Logout"]
 
     choice = st.sidebar.selectbox("Menu", menu)
 
@@ -66,17 +73,18 @@ def main():
         username, password = st.text_input("Username"), st.text_input("Password", type='password')
         if st.button("Login"):
             result = login_user(username, password)
-            if result.get('message') == 'Login successful':
+            if 'token' in result:
                 st.session_state['logged_in'] = True
                 st.session_state['username'] = username
-                st.experimental_rerun()
+                st.session_state['token'] = result['token']
+                st.rerun()()
             else:
                 st.error(result['message'])
 
     elif choice == "View Book Details":
         book_id = st.text_input("Enter the Book ID to view details")
         if st.button("Get Details"):
-            book_details, success = get_book_details(book_id)
+            book_details, success = get_book_details(st.session_state['token'], book_id)
             if success:
                 st.write(f"ID: {book_details['id']}, Title: {book_details['title']}, Author: {book_details['author']}, Status: {book_details['status']}")
             else:
@@ -89,7 +97,7 @@ def main():
         book_author = st.text_input("Book Author")
         book_info = {"title": book_title, "author": book_author, "status": "available"}
         if st.button("Add Book"):
-            result = add_book(book_id, book_info)
+            result = add_book(st.session_state['token'], book_id, book_info)
             st.success(result['message'])
 
         st.subheader("Upload Book List")
@@ -118,7 +126,7 @@ def main():
                         books.append({"book_id": book_id, "book_info": book_info})
 
                     if st.button("Upload Book List"):
-                        result = add_books_bulk(books)
+                        result = add_books_bulk(st.session_state['token'], books)
                         st.write("Books successfully added:")
                         for book in result['added']:
                             st.write(f"ID: {book['book_id']}, Title: {book['title']}")
@@ -132,26 +140,27 @@ def main():
         st.subheader("Issue Book")
         book_id = st.text_input("Book ID")
         if st.button("Issue Book"):
-            result = issue_book(book_id)
+            result = issue_book(st.session_state['token'], book_id)
             st.success(result['message'])
 
     elif choice == "Return Book" and st.session_state['logged_in']:
         st.subheader("Return Book")
         book_id = st.text_input("Book ID")
         if st.button("Return Book"):
-            result = return_book(book_id)
+            result = return_book(st.session_state['token'], book_id)
             st.success(result['message'])
 
     elif choice == "View All Books" and st.session_state['logged_in']:
         st.subheader("Available Books")
-        books = get_books()
+        books = get_books(st.session_state['token'])
         for book_id, book_info in books.items():
             st.write(f"ID: {book_id}, Title: {book_info['title']}, Author: {book_info['author']}, Status: {book_info['status']}")
 
     elif choice == "Logout" and st.session_state['logged_in']:
         st.session_state['logged_in'] = False
         st.session_state['username'] = ''
-        st.experimental_rerun()
+        st.session_state['token'] = ''
+        st.rerun()()
         st.success("You have been logged out.")
 
     else:
