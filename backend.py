@@ -5,7 +5,7 @@ from pymongo import MongoClient
 app = Flask(__name__)
 CORS(app)
 
-client = MongoClient('mongodb+srv://iabhishekapp:BNYopb29Qevxi8Ch@backendpro.5qozij5.mongodb.net/?retryWrites=true&w=majority&appName=BackendPro') #Update env variable
+client = MongoClient('env-var') #Update env variable
 db = client['library_db']
 users_collection = db['users']
 books_collection = db['books']
