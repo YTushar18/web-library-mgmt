@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
+import pandas as pd
+import io
 
-BASE_URL = "http://127.0.0.1:5000"  
+BASE_URL = "http://127.0.0.1:5000"
 
 def register_user(username, password):
     response = requests.post(f"{BASE_URL}/register", json={"username": username, "password": password})
@@ -13,6 +15,10 @@ def login_user(username, password):
 
 def add_book(book_id, book_info):
     response = requests.post(f"{BASE_URL}/books", json={"book_id": book_id, "book_info": book_info})
+    return response.json()
+
+def add_books_bulk(books):
+    response = requests.post(f"{BASE_URL}/books/bulk", json={"books": books})
     return response.json()
 
 def get_books():
@@ -43,7 +49,7 @@ def main():
 
     menu = ["Home", "Login", "Register", "View Book Details"]
     if st.session_state['logged_in']:
-        menu.extend(["Add Book", "Issue Book", "Return Book", "View All Books", "Logout"])
+        menu = ["Home", "Add Book", "Issue Book", "Return Book", "View All Books", "Logout"]
 
     choice = st.sidebar.selectbox("Menu", menu)
 
@@ -86,6 +92,42 @@ def main():
             result = add_book(book_id, book_info)
             st.success(result['message'])
 
+        st.subheader("Upload Book List")
+        uploaded_file = st.file_uploader("Choose a CSV or TXT file", type=["csv", "txt"])
+        if uploaded_file is not None:
+            try:
+                content = uploaded_file.read().decode("utf-8").strip().splitlines()
+                st.write("File content preview:", content[:5])  # Show the first 5 lines of the file for debugging
+
+                # Read header and validate
+                header = content[0].split(',')
+                required_columns = {"Book ID", "Book Title", "Book Author"}
+                if not required_columns.issubset(set(map(str.strip, header))):
+                    st.error(f"File must contain columns: {', '.join(required_columns)}")
+                else:
+                    books = []
+                    for line in content[1:]:  # Skip header
+                        book_data = line.split(',')
+                        if len(book_data) != 3:
+                            st.error(f"Invalid format in line: {line}")
+                            continue
+                        book_id = book_data[0].strip()
+                        book_title = book_data[1].strip()
+                        book_author = book_data[2].strip()
+                        book_info = {"title": book_title, "author": book_author, "status": "available"}
+                        books.append({"book_id": book_id, "book_info": book_info})
+
+                    if st.button("Upload Book List"):
+                        result = add_books_bulk(books)
+                        st.write("Books successfully added:")
+                        for book in result['added']:
+                            st.write(f"ID: {book['book_id']}, Title: {book['title']}")
+                        st.write("Books failed to add:")
+                        for book in result['failed']:
+                            st.write(f"ID: {book['book_id']}, Reason: {book['reason']}")
+            except Exception as e:
+                st.error(f"Error processing file: {e}")
+
     elif choice == "Issue Book" and st.session_state['logged_in']:
         st.subheader("Issue Book")
         book_id = st.text_input("Book ID")
@@ -109,7 +151,7 @@ def main():
     elif choice == "Logout" and st.session_state['logged_in']:
         st.session_state['logged_in'] = False
         st.session_state['username'] = ''
-        st.experimental_rerun() 
+        st.experimental_rerun()
         st.success("You have been logged out.")
 
     else:
