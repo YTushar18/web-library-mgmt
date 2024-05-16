@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 import io
 
-BASE_URL = "http://127.0.0.1:5000"
+BASE_URL = "http://127.0.0.1:5002"
 
 def register_user(username, password):
     response = requests.post(f"{BASE_URL}/register", json={"username": username, "password": password})
@@ -54,9 +54,9 @@ def main():
         st.session_state['username'] = ''
         st.session_state['token'] = ''
 
-    menu = ["Home", "Login", "Register", "View Book Details"]
+    menu = ["Home", "Login", "Register"]
     if st.session_state['logged_in']:
-        menu = ["Home", "Add Book", "Issue Book", "Return Book", "View All Books", "Logout"]
+        menu = ["Home", "Add Book", "Issue Book", "Return Book", "View Book Details", "View All Books", "Logout"]
 
     choice = st.sidebar.selectbox("Menu", menu)
 
