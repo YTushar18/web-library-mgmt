@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from pymongo import MongoClient
 import certifi
@@ -6,6 +6,7 @@ from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 from flask_bcrypt import Bcrypt
 import jwt
+import os
 from functools import wraps
 
 app = Flask(__name__)
@@ -23,7 +24,12 @@ books_collection = db['books']
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('x-access-token')
+
+        if 'jwt' in request.cookies:
+            token = request.cookies['jwt']
+
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 403 
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
         try:
@@ -31,11 +37,15 @@ def token_required(f):
             current_user = users_collection.find_one({'_id': ObjectId(data['user_id'])})
             if not current_user:
                 return jsonify({'message': 'User not found!'}), 401
+        
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token is invalid! Signature has expired'}), 401
+        
         except jwt.InvalidTokenError as e:
             return jsonify({'message': f'Token is invalid! {str(e)}'}), 401
+        
         return f(current_user, *args, **kwargs)
+    
     return decorated
 
 @app.route('/register', methods=['POST'])
@@ -61,21 +71,23 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    try:
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        
-        user = users_collection.find_one({'username': username})
-        if not user or not bcrypt.check_password_hash(user['password'], password):
-            return jsonify({'message': 'Invalid username or password!'}), 401
-        
-        expiration = datetime.utcnow() + timedelta(minutes=30)
-        
-        token = jwt.encode({'user_id': str(user['_id']), 'exp': expiration}, app.config['SECRET_KEY'], algorithm="HS256")
-        return jsonify({'token': token})
-    except:
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    
+    user = users_collection.find_one({'username': username})
+    if not user or not bcrypt.check_password_hash(user['password'], password):
         return jsonify({'message': 'Invalid username or password!'}), 401
+    
+    expiration = datetime.utcnow() + timedelta(minutes=30)
+    
+    token = jwt.encode({'user_id': str(user['_id']), 'exp': expiration}, app.config['SECRET_KEY'], algorithm="HS256")
+    
+    resp = make_response(jsonify({'login': 'Successful'}))
+    resp.set_cookie('jwt', token, httponly=True)  
+    return resp
+
+
 
 @app.route('/books', methods=['GET', 'POST'])
 @token_required
@@ -147,4 +159,4 @@ def get_book(current_user, book_id):
         return jsonify({'message': 'Book not found'}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5002)
+    app.run(debug=True)
